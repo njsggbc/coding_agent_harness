@@ -1,7 +1,8 @@
 import asyncio
+import base64
+import shlex
 from typing import Optional
 import docker
-from docker.models.containers import Container
 from harness.sandbox.base import Sandbox, ExecResult
 
 
@@ -27,32 +28,39 @@ class DockerSandbox(Sandbox):
 
     async def exec(self, container_id: str, command: str, workdir: Optional[str] = None) -> ExecResult:
         container = self.client.containers.get(container_id)
-        kwargs = {"cmd": ["sh", "-c", command]}
+        kwargs = {"cmd": ["sh", "-c", command], "demux": True}
         if workdir:
             kwargs["workdir"] = workdir
 
         result = await self._run_async(container.exec_run, **kwargs)
+        exit_code, (stdout, stderr) = result
         return ExecResult(
-            exit_code=result.exit_code,
-            stdout=result.output.decode("utf-8", errors="replace") if result.output else "",
-            stderr="",
+            exit_code=exit_code,
+            stdout=stdout.decode("utf-8", errors="replace") if stdout else "",
+            stderr=stderr.decode("utf-8", errors="replace") if stderr else "",
         )
 
     async def read_file(self, container_id: str, path: str) -> str:
-        result = await self.exec(container_id, f"cat '{path}'")
+        result = await self.exec(container_id, f"cat {shlex.quote(path)}")
         if result.exit_code != 0:
-            raise FileNotFoundError(f"Cannot read {path}: {result.stdout}")
+            raise FileNotFoundError(f"Cannot read {path}: {result.stdout or result.stderr}")
         return result.stdout
 
     async def write_file(self, container_id: str, path: str, content: str):
-        escaped = content.replace("'", "'\\''")
-        result = await self.exec(container_id, f"cat > '{path}' << 'EOF'\n{escaped}\nEOF")
+        encoded = base64.b64encode(content.encode()).decode()
+        result = await self.exec(
+            container_id, f"echo {shlex.quote(encoded)} | base64 -d > {shlex.quote(path)}"
+        )
         if result.exit_code != 0:
-            raise RuntimeError(f"Cannot write {path}: {result.stdout}")
+            raise RuntimeError(f"Cannot write {path}: {result.stdout or result.stderr}")
 
     async def setup(self, container_id: str, commands: list[str]):
         for cmd in commands:
-            await self.exec(container_id, cmd)
+            result = await self.exec(container_id, cmd)
+            if result.exit_code != 0:
+                raise RuntimeError(
+                    f"Setup command failed: {cmd}\nstdout: {result.stdout}\nstderr: {result.stderr}"
+                )
 
     async def stop(self, container_id: str):
         try:
