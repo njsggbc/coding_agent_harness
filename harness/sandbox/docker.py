@@ -1,0 +1,62 @@
+import asyncio
+from typing import Optional
+import docker
+from docker.models.containers import Container
+from harness.sandbox.base import Sandbox, ExecResult
+
+
+class DockerSandbox(Sandbox):
+    def __init__(self, client: docker.DockerClient):
+        self.client = client
+
+    async def _run_async(self, func, *args, **kwargs):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
+
+    async def create(self, image: str, workdir: str, repo_path: str) -> str:
+        container = await self._run_async(
+            self.client.containers.run,
+            image=image,
+            command="tail -f /dev/null",
+            volumes={repo_path: {"bind": workdir, "mode": "rw"}},
+            working_dir=workdir,
+            detach=True,
+            remove=True,
+        )
+        return container.id
+
+    async def exec(self, container_id: str, command: str, workdir: Optional[str] = None) -> ExecResult:
+        container = self.client.containers.get(container_id)
+        kwargs = {"cmd": ["sh", "-c", command]}
+        if workdir:
+            kwargs["workdir"] = workdir
+
+        result = await self._run_async(container.exec_run, **kwargs)
+        return ExecResult(
+            exit_code=result.exit_code,
+            stdout=result.output.decode("utf-8", errors="replace") if result.output else "",
+            stderr="",
+        )
+
+    async def read_file(self, container_id: str, path: str) -> str:
+        result = await self.exec(container_id, f"cat '{path}'")
+        if result.exit_code != 0:
+            raise FileNotFoundError(f"Cannot read {path}: {result.stdout}")
+        return result.stdout
+
+    async def write_file(self, container_id: str, path: str, content: str):
+        escaped = content.replace("'", "'\\''")
+        result = await self.exec(container_id, f"cat > '{path}' << 'EOF'\n{escaped}\nEOF")
+        if result.exit_code != 0:
+            raise RuntimeError(f"Cannot write {path}: {result.stdout}")
+
+    async def setup(self, container_id: str, commands: list[str]):
+        for cmd in commands:
+            await self.exec(container_id, cmd)
+
+    async def stop(self, container_id: str):
+        try:
+            container = self.client.containers.get(container_id)
+            await self._run_async(container.stop, timeout=5)
+        except docker.errors.NotFound:
+            pass
