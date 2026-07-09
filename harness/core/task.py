@@ -52,19 +52,45 @@ class TaskConfig:
 
     @classmethod
     def from_dict(cls, data: dict) -> "TaskConfig":
+        required_fields = ["id", "name", "description", "repo", "branch", "environment", "agent", "sandbox"]
+        for field in required_fields:
+            if field not in data:
+                raise KeyError(f"Missing required field: '{field}'")
+
+        if not isinstance(data.get("environment"), dict):
+            raise KeyError("'environment' section must be a dictionary")
+        if not isinstance(data.get("agent"), dict):
+            raise KeyError("'agent' section must be a dictionary")
+        if not isinstance(data.get("sandbox"), dict):
+            raise KeyError("'sandbox' section must be a dictionary")
+
+        env_data = data["environment"]
+        if "image" not in env_data:
+            raise KeyError("Missing required field: 'environment.image'")
+
+        agent_data = data["agent"]
+        for field in ["model", "max_turns", "temperature"]:
+            if field not in agent_data:
+                raise KeyError(f"Missing required field: 'agent.{field}'")
+
+        sandbox_data = data["sandbox"]
+        for field in ["workdir", "timeout"]:
+            if field not in sandbox_data:
+                raise KeyError(f"Missing required field: 'sandbox.{field}'")
+
         env = EnvironmentConfig(
-            image=data["environment"]["image"],
-            setup_commands=data["environment"].get("setup_commands", []),
+            image=env_data["image"],
+            setup_commands=env_data.get("setup_commands", []),
         )
         agent = AgentConfig(
-            model=data["agent"]["model"],
-            max_turns=data["agent"]["max_turns"],
-            temperature=data["agent"]["temperature"],
+            model=agent_data["model"],
+            max_turns=agent_data["max_turns"],
+            temperature=agent_data["temperature"],
         )
         sandbox = SandboxConfig(
-            workdir=data["sandbox"]["workdir"],
-            timeout=data["sandbox"]["timeout"],
-            blocked_commands=data["sandbox"].get("blocked_commands", []),
+            workdir=sandbox_data["workdir"],
+            timeout=sandbox_data["timeout"],
+            blocked_commands=sandbox_data.get("blocked_commands", []),
         )
         verification = None
         if "verification" in data and data["verification"] is not None:
@@ -85,8 +111,26 @@ class TaskConfig:
             verification=verification,
         )
 
+    @classmethod
+    def from_yaml(cls, path: str) -> "TaskConfig":
+        return load_task_config(path)
+
 
 def load_task_config(path: str) -> TaskConfig:
-    with open(path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return TaskConfig.from_dict(data)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Task config file not found: {path}")
+    except yaml.YAMLError as e:
+        raise yaml.YAMLError(f"Invalid YAML in task config: {path}\n{e}")
+
+    if data is None:
+        raise ValueError(f"Task config file is empty: {path}")
+    if not isinstance(data, dict):
+        raise ValueError(f"Task config must be a YAML mapping, got {type(data).__name__}: {path}")
+
+    try:
+        return TaskConfig.from_dict(data)
+    except KeyError as e:
+        raise KeyError(f"Invalid task config in {path}: {e}")

@@ -42,7 +42,7 @@ verification:
 """
 
 
-def test_task_config_from_yaml(tmp_path):
+def test_load_task_config(tmp_path):
     task_file = tmp_path / "task.yaml"
     task_file.write_text(SAMPLE_TASK_YAML, encoding="utf-8")
 
@@ -105,3 +105,74 @@ def test_task_status_enum():
     assert TaskStatus.DONE.value == "done"
     assert TaskStatus.FAILED.value == "failed"
     assert TaskStatus.CANCELLED.value == "cancelled"
+
+
+def test_from_yaml_classmethod(tmp_path):
+    task_file = tmp_path / "task.yaml"
+    task_file.write_text(SAMPLE_TASK_YAML, encoding="utf-8")
+
+    config = TaskConfig.from_yaml(str(task_file))
+
+    assert config.id == "bug-123"
+    assert config.name == "修复登录超时"
+
+
+def test_load_task_config_file_not_found():
+    with pytest.raises(FileNotFoundError, match="Task config file not found"):
+        load_task_config("nonexistent.yaml")
+
+
+def test_load_task_config_invalid_yaml(tmp_path):
+    task_file = tmp_path / "task.yaml"
+    task_file.write_text("id: [unclosed\n", encoding="utf-8")
+
+    with pytest.raises(yaml.YAMLError, match="Invalid YAML in task config"):
+        load_task_config(str(task_file))
+
+
+def test_load_task_config_empty_file(tmp_path):
+    task_file = tmp_path / "task.yaml"
+    task_file.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Task config file is empty"):
+        load_task_config(str(task_file))
+
+
+def test_load_task_config_not_a_mapping(tmp_path):
+    task_file = tmp_path / "task.yaml"
+    task_file.write_text("- item1\n- item2\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Task config must be a YAML mapping"):
+        load_task_config(str(task_file))
+
+
+def test_from_dict_missing_required_field():
+    with pytest.raises(KeyError, match="Missing required field: 'id'"):
+        TaskConfig.from_dict({"name": "test"})
+
+
+def test_from_dict_missing_nested_section():
+    with pytest.raises(KeyError, match="Missing required field: 'environment'"):
+        TaskConfig.from_dict({
+            "id": "t1",
+            "name": "test",
+            "description": "desc",
+            "repo": "r",
+            "branch": "b",
+            "agent": {},
+            "sandbox": {},
+        })
+
+
+def test_from_dict_missing_nested_field():
+    with pytest.raises(KeyError, match="Missing required field: 'agent.model'"):
+        TaskConfig.from_dict({
+            "id": "t1",
+            "name": "test",
+            "description": "desc",
+            "repo": "r",
+            "branch": "b",
+            "environment": {"image": "img"},
+            "agent": {},
+            "sandbox": {"workdir": "/w", "timeout": 30},
+        })
