@@ -15,9 +15,9 @@ class ReadFileTool(Tool):
         "required": ["path"],
     }
 
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         try:
-            content = await sandbox.read_file("", args["path"])
+            content = await sandbox.read_file(container_id, args["path"])
             lines = content.split("\n")
             offset = args.get("offset", 1) - 1
             limit = args.get("limit")
@@ -42,9 +42,9 @@ class WriteFileTool(Tool):
         "required": ["path", "content"],
     }
 
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         try:
-            await sandbox.write_file("", args["path"], args["content"])
+            await sandbox.write_file(container_id, args["path"], args["content"])
             return ToolResult(success=True, output=f"File written: {args['path']}")
         except Exception as e:
             return ToolResult(success=False, output="", error=str(e))
@@ -63,9 +63,9 @@ class EditFileTool(Tool):
         "required": ["path", "old_str", "new_str"],
     }
 
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         try:
-            content = await sandbox.read_file("", args["path"])
+            content = await sandbox.read_file(container_id, args["path"])
             old_str = args["old_str"]
             new_str = args["new_str"]
 
@@ -85,7 +85,7 @@ class EditFileTool(Tool):
                 )
 
             new_content = content.replace(old_str, new_str, 1)
-            await sandbox.write_file("", args["path"], new_content)
+            await sandbox.write_file(container_id, args["path"], new_content)
             return ToolResult(success=True, output=f"File edited: {args['path']}")
         except Exception as e:
             return ToolResult(success=False, output="", error=str(e))

@@ -29,7 +29,7 @@ async def test_build_context_includes_repo_summary():
     )
 
     sandbox = FakeContextSandbox()
-    context = await build_context(sandbox, task)
+    context = await build_context(sandbox, task, "test-container")
 
     assert "Fix the login bug in auth module" in context
     assert "src/main.py" in context

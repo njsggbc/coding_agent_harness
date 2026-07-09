@@ -15,12 +15,12 @@ class SearchContentTool(Tool):
         "required": ["pattern"],
     }
 
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         try:
             cmd_parts = ["grep", "-rn", "--include", args.get("include", "*")]
             search_path = args.get("path", ".")
             cmd_parts.extend([args["pattern"], search_path])
-            result = await sandbox.exec("", " ".join(cmd_parts))
+            result = await sandbox.exec(container_id, " ".join(cmd_parts))
             return ToolResult(success=True, output=result.stdout or "No matches found")
         except Exception as e:
             return ToolResult(success=False, output="", error=str(e))
@@ -38,10 +38,10 @@ class SearchFilesTool(Tool):
         "required": ["pattern"],
     }
 
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         try:
             search_path = args.get("path", ".")
-            result = await sandbox.exec("", f"find {search_path} -name '{args['pattern']}' -type f")
+            result = await sandbox.exec(container_id, f"find {search_path} -name '{args['pattern']}' -type f")
             return ToolResult(success=True, output=result.stdout or "No files found")
         except Exception as e:
             return ToolResult(success=False, output="", error=str(e))

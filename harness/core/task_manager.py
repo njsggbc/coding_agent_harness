@@ -1,4 +1,6 @@
 import os
+import asyncio
+import logging
 import tempfile
 import docker
 import git
@@ -16,6 +18,8 @@ from harness.observer.base import Observer
 from harness.storage.db import TaskStore
 from harness.storage.files import FileStore
 
+logger = logging.getLogger(__name__)
+
 
 class TaskManager:
     def __init__(
@@ -31,6 +35,7 @@ class TaskManager:
         self.observer = observer
         self.data_dir = data_dir
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+        self._cancel_events: dict[str, asyncio.Event] = {}
 
     async def run(self, task: TaskConfig, task_file: str) -> LoopResult:
         self.task_store.create(task, task_file)
@@ -39,6 +44,9 @@ class TaskManager:
         sandbox = None
         container_id = None
         repo_dir = None
+
+        cancel_event = asyncio.Event()
+        self._cancel_events[task.id] = cancel_event
 
         try:
             docker_client = docker.from_env()
@@ -83,9 +91,16 @@ class TaskManager:
                 observer=self.observer,
                 config=task.agent,
                 container_id=container_id,
+                cancel_event=cancel_event,
             )
 
-            result = await loop.run(task)
+            result = await asyncio.wait_for(
+                loop.run(task),
+                timeout=task.sandbox.timeout,
+            )
+
+            if task.verification and task.verification.commands:
+                await self._run_verification(sandbox, container_id, task)
 
             self.task_store.update_result(
                 task.id,
@@ -104,6 +119,19 @@ class TaskManager:
 
             return result
 
+        except asyncio.TimeoutError:
+            logger.warning("Task %s timed out after %ds", task.id, task.sandbox.timeout)
+            self.task_store.update_result(task.id, turns=0, tokens_used=0, error=f"Task timed out after {task.sandbox.timeout}s")
+            self.task_store.update_status(task.id, TaskStatus.FAILED)
+            return LoopResult(
+                status="failed",
+                diff="",
+                turns=0,
+                tokens_used=0,
+                messages=[],
+                tool_calls=[],
+                error=f"Task timed out after {task.sandbox.timeout}s",
+            )
         except Exception as e:
             self.task_store.update_result(task.id, turns=0, tokens_used=0, error=str(e))
             self.task_store.update_status(task.id, TaskStatus.FAILED)
@@ -117,6 +145,7 @@ class TaskManager:
                 error=str(e),
             )
         finally:
+            self._cancel_events.pop(task.id, None)
             if sandbox and container_id:
                 try:
                     await sandbox.stop(container_id)
@@ -126,7 +155,22 @@ class TaskManager:
                 import shutil
                 shutil.rmtree(repo_dir, ignore_errors=True)
 
+    async def _run_verification(self, sandbox, container_id, task):
+        for cmd in task.verification.commands:
+            try:
+                result = await sandbox.exec(container_id, cmd)
+                logger.info("Verification [%s]: %s -> exit=%d", task.id, cmd, result.exit_code)
+                if result.stdout:
+                    logger.info("Verification [%s] stdout: %s", task.id, result.stdout.strip())
+                if result.stderr:
+                    logger.warning("Verification [%s] stderr: %s", task.id, result.stderr.strip())
+            except Exception as e:
+                logger.warning("Verification [%s] failed to run '%s': %s", task.id, cmd, e)
+
     def cancel(self, task_id: str):
+        event = self._cancel_events.get(task_id)
+        if event:
+            event.set()
         self.task_store.update_status(task_id, TaskStatus.CANCELLED)
 
     def get_status(self, task_id: str):

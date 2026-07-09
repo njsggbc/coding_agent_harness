@@ -28,7 +28,7 @@ class Tool(ABC):
         ...
 
     @abstractmethod
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         ...
 
 

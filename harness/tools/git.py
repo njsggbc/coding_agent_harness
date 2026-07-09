@@ -10,9 +10,9 @@ class GitDiffTool(Tool):
         "properties": {},
     }
 
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         try:
-            result = await sandbox.exec("", "git diff")
+            result = await sandbox.exec(container_id, "git diff")
             return ToolResult(success=True, output=result.stdout or "No changes")
         except Exception as e:
             return ToolResult(success=False, output="", error=str(e))
@@ -28,10 +28,10 @@ class GitLogTool(Tool):
         },
     }
 
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         try:
             count = args.get("count", 10)
-            result = await sandbox.exec("", f"git log --oneline -{count}")
+            result = await sandbox.exec(container_id, f"git log --oneline -{count}")
             return ToolResult(success=True, output=result.stdout or "No commits")
         except Exception as e:
             return ToolResult(success=False, output="", error=str(e))
@@ -48,9 +48,9 @@ class ListDirTool(Tool):
         "required": ["path"],
     }
 
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         try:
-            result = await sandbox.exec("", f"ls -la {args['path']}")
+            result = await sandbox.exec(container_id, f"ls -la {args['path']}")
             return ToolResult(success=True, output=result.stdout)
         except Exception as e:
             return ToolResult(success=False, output="", error=str(e))

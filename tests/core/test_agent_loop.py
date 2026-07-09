@@ -52,7 +52,7 @@ class FakeEchoTool(Tool):
         "required": ["message"],
     }
 
-    async def execute(self, args, sandbox):
+    async def execute(self, args, sandbox, container_id):
         return ToolResult(success=True, output=args["message"])
 
 

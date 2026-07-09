@@ -1,6 +1,7 @@
 import json
 import time
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import Optional
 from harness.core.task import TaskConfig, AgentConfig
@@ -13,6 +14,10 @@ from harness.observer.base import (
     Observer, TurnStart, ToolCallStart, ToolCallEnd,
     AgentThinking, LoopError, LoopComplete, SandboxEvent,
 )
+
+logger = logging.getLogger(__name__)
+
+TOOL_TIMEOUT = 30
 
 
 @dataclass
@@ -50,6 +55,7 @@ class AgentLoop:
         observer: Observer,
         config: AgentConfig,
         container_id: str,
+        cancel_event: Optional[asyncio.Event] = None,
     ):
         self.adapter = adapter
         self.tools = tools
@@ -58,11 +64,12 @@ class AgentLoop:
         self.observer = observer
         self.config = config
         self.container_id = container_id
+        self.cancel_event = cancel_event
 
     async def run(self, task: TaskConfig) -> LoopResult:
         self.observer.emit(SandboxEvent(message="Building repository context..."))
 
-        context = await build_context(self.sandbox, task)
+        context = await build_context(self.sandbox, task, self.container_id)
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -77,6 +84,9 @@ class AgentLoop:
 
         try:
             while turn < self.config.max_turns:
+                if self.cancel_event and self.cancel_event.is_set():
+                    raise asyncio.CancelledError("Task cancelled by user")
+
                 turn += 1
                 self.observer.emit(TurnStart(turn_number=turn))
 
@@ -123,7 +133,13 @@ class AgentLoop:
                         err = f"Unknown tool: {tc.name}"
                         result = ToolResult(success=False, output="", error=err)
                     else:
-                        result = await tool.execute(tc.arguments, self.sandbox)
+                        try:
+                            result = await asyncio.wait_for(
+                                tool.execute(tc.arguments, self.sandbox, self.container_id),
+                                timeout=TOOL_TIMEOUT,
+                            )
+                        except asyncio.TimeoutError:
+                            result = ToolResult(success=False, output="", error=f"Tool execution timed out after {TOOL_TIMEOUT}s")
 
                     duration = time.monotonic() - t0
                     self.observer.emit(ToolCallEnd(tool_name=tc.name, result=result.output or result.error or "", duration=duration))

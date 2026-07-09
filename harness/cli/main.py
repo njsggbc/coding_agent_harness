@@ -1,4 +1,5 @@
 import os
+import signal
 import asyncio
 import click
 import yaml
@@ -92,7 +93,36 @@ def run(task_file, no_stream, data_dir):
     click.echo(f"Agent: {task.agent.model} | Max turns: {task.agent.max_turns}")
     click.echo(f"Repo: {task.repo} ({task.branch})")
 
-    result = asyncio.run(manager.run(task, task_file))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    main_task = loop.create_task(manager.run(task, task_file))
+
+    def signal_handler(sig, frame):
+        if not main_task.done():
+            click.echo("\nCaught signal, cancelling task...")
+            manager.cancel(task.id)
+            main_task.cancel()
+
+    if os.name != "nt":
+        loop.add_signal_handler(signal.SIGINT, signal_handler)
+        loop.add_signal_handler(signal.SIGTERM, signal_handler)
+    else:
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+    try:
+        result = loop.run_until_complete(main_task)
+    except asyncio.CancelledError:
+        click.echo("\nTask cancelled.")
+        result = None
+    except KeyboardInterrupt:
+        click.echo("\nTask interrupted.")
+        result = None
+    finally:
+        loop.close()
+
+    if result is None:
+        return
 
     click.echo(f"\nTask {result.status} in {result.turns} turns, {result.tokens_used} tokens")
     if result.diff:

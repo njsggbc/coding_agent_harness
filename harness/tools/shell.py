@@ -16,9 +16,9 @@ class RunShellTool(Tool):
 
     MAX_OUTPUT = 8000
 
-    async def execute(self, args: dict, sandbox: Sandbox) -> ToolResult:
+    async def execute(self, args: dict, sandbox: Sandbox, container_id: str) -> ToolResult:
         try:
-            result = await sandbox.exec("", args["command"], workdir=args.get("workdir"))
+            result = await sandbox.exec(container_id, args["command"], workdir=args.get("workdir"))
             output = result.stdout
             if len(output) > self.MAX_OUTPUT:
                 output = output[:self.MAX_OUTPUT] + "\n... (output truncated)"

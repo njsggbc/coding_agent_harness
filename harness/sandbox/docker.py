@@ -1,9 +1,12 @@
 import asyncio
 import base64
+import logging
 import shlex
 from typing import Optional
 import docker
 from harness.sandbox.base import Sandbox, ExecResult
+
+logger = logging.getLogger(__name__)
 
 
 class DockerSandbox(Sandbox):
@@ -58,8 +61,9 @@ class DockerSandbox(Sandbox):
         for cmd in commands:
             result = await self.exec(container_id, cmd)
             if result.exit_code != 0:
-                raise RuntimeError(
-                    f"Setup command failed: {cmd}\nstdout: {result.stdout}\nstderr: {result.stderr}"
+                logger.warning(
+                    "Setup command failed (continuing): %s\nstdout: %s\nstderr: %s",
+                    cmd, result.stdout, result.stderr,
                 )
 
     async def stop(self, container_id: str):

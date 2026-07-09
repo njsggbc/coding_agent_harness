@@ -2,13 +2,13 @@ from harness.core.task import TaskConfig
 from harness.sandbox.base import Sandbox
 
 
-async def build_context(sandbox: Sandbox, task: TaskConfig) -> str:
+async def build_context(sandbox: Sandbox, task: TaskConfig, container_id: str) -> str:
     parts = []
 
-    result = await sandbox.exec("", f"find . -type f -not -path './.git/*' | head -100")
+    result = await sandbox.exec(container_id, f"find . -type f -not -path './.git/*' | head -100")
     file_list = result.stdout.strip()
 
-    result = await sandbox.exec("", "git log --oneline -5")
+    result = await sandbox.exec(container_id, "git log --oneline -5")
     recent_commits = result.stdout.strip()
 
     parts.append("## Repository Structure")
