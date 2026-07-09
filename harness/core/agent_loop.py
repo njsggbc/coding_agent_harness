@@ -73,6 +73,7 @@ class AgentLoop:
         all_tool_calls = []
         total_tokens = 0
         turn = 0
+        response = None
 
         try:
             while turn < self.config.max_turns:
@@ -146,7 +147,7 @@ class AgentLoop:
             except Exception:
                 pass
 
-            if turn >= self.config.max_turns and not response.content:
+            if response is None or (turn >= self.config.max_turns and not response.content):
                 return LoopResult(
                     status="failed",
                     diff=diff,
