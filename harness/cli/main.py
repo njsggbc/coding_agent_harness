@@ -64,10 +64,9 @@ def cli(ctx):
 
 @cli.command()
 @click.argument("task_file", type=click.Path(exists=True))
-@click.option("--verbose", is_flag=True, help="Stream agent output in real-time")
 @click.option("--no-stream", is_flag=True, help="Suppress real-time streaming")
 @click.option("--data-dir", default=None, help="Override data directory")
-def run(task_file, verbose, no_stream, data_dir):
+def run(task_file, no_stream, data_dir):
     """Execute a bug-fixing task from a YAML file."""
     config = load_config()
     api_key = resolve_api_key(config)
