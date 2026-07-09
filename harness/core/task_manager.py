@@ -95,7 +95,7 @@ class TaskManager:
             )
             self.task_store.update_status(
                 task.id,
-                TaskStatus.DONE if result.status == "done" else TaskStatus.FAILED,
+                TaskStatus.DONE if result.status == "done" else TaskStatus.CANCELLED if result.status == "cancelled" else TaskStatus.FAILED,
             )
 
             self.file_store.save_messages(task.id, result.messages)

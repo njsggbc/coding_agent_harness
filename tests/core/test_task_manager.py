@@ -103,3 +103,24 @@ def test_task_manager_list_all(temp_dir):
 
     tasks = manager.list_all()
     assert len(tasks) == 2
+
+
+def test_task_manager_cancel(temp_dir):
+    store = TaskStore(str(temp_dir))
+    file_store = FileStore(str(temp_dir))
+    observer = Observer()
+
+    manager = TaskManager(
+        task_store=store,
+        file_store=file_store,
+        observer=observer,
+        data_dir=str(temp_dir),
+    )
+
+    task = make_task()
+    store.create(task, "tasks/bug-001.yaml")
+
+    manager.cancel("bug-001")
+
+    record = store.get("bug-001")
+    assert record["status"] == "cancelled"
