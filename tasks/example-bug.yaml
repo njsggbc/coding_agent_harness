@@ -1,0 +1,26 @@
+id: "example-bug"
+name: "Example Bug Fix"
+description: |
+  This is an example bug fix task.
+  The repository contains a simple Python project with a bug.
+repo: "https://github.com/example/demo-repo"
+branch: "main"
+
+environment:
+  image: "python:3.11-alpine"
+  setup_commands:
+    - "echo 'setup complete'"
+
+agent:
+  model: "gpt-4o"
+  max_turns: 30
+  temperature: 0.0
+
+sandbox:
+  workdir: "/workspace"
+  timeout: 600
+  blocked_commands: []
+
+verification:
+  commands:
+    - "pytest tests/"
