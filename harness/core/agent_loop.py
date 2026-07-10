@@ -14,6 +14,7 @@ from harness.observer.base import (
     Observer, TurnStart, ToolCallStart, ToolCallEnd,
     AgentThinking, LoopError, LoopComplete, SandboxEvent,
 )
+from harness.feedback import FeedbackAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,7 @@ class AgentLoop:
                     break
 
                 tool_results = []
+                feedback_results = []
                 for tc in response.tool_calls:
                     self.observer.emit(ToolCallStart(tool_name=tc.name, args=tc.arguments))
 
@@ -125,6 +127,7 @@ class AgentLoop:
                         self.observer.emit(ToolCallEnd(tool_name=tc.name, result=str(e), duration=0))
                         tool_results.append({"tool_call_id": tc.id, "role": "tool", "content": str(e)})
                         all_tool_calls.append({"turn": turn, "tool": tc.name, "args": tc.arguments, "result": str(e), "success": False})
+                        feedback_results.append(FeedbackAnalyzer.analyze(tc.name, "", exit_code=0, error=str(e)))
                         continue
 
                     t0 = time.monotonic()
@@ -153,8 +156,17 @@ class AgentLoop:
                         "turn": turn, "tool": tc.name, "args": tc.arguments,
                         "result": result.output or result.error, "success": result.success,
                     })
+                    feedback_results.append(FeedbackAnalyzer.analyze(tc.name, result.output, exit_code=0, error=result.error))
 
                 messages.extend(tool_results)
+
+                for fb in feedback_results:
+                    if not fb.success:
+                        messages.append({
+                            "role": "user",
+                            "content": f"[FEEDBACK] {fb.summary}. {fb.suggestion}",
+                        })
+                        break
 
             diff = ""
             try:
