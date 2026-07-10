@@ -14,7 +14,7 @@ A CLI tool for orchestrating OpenAI-powered coding agents to fix bugs inside Doc
 ### Installation
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/njsggbc/coding_agent_harness.git
 cd coding-agent-harness
 pip install -e .
 ```
