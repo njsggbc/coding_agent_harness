@@ -344,6 +344,22 @@
 
 ---
 
+## 2026-07-10 | CI 修复
+
+**触发**: GitHub Actions CI 失败
+
+**关键 Prompt**: CI 日志显示 `openai.AuthenticationError: Error code: 401`
+
+**根因分析**: CI 设置了 `OPENAI_API_KEY: "sk-test-placeholder"`，导致 OpenAI 适配器测试检测到 key 存在而不跳过，实际调用 API 返回 401。
+
+**修复**: Commit `8ffce4a` — 移除 CI 中的 fake API key，让测试正常 skip（`os.environ.get("OPENAI_API_KEY") is None` → `pytest.skip`）
+
+**之前的误判**: 前几次尝试修复 keyring 导入问题（`importorskip`、`keyrings.alt`、移除 keyring 依赖）都是误判，真正的问题只是 CI 中设置了一个 fake API key 导致测试不跳过。114 tests passed, 2 skipped (OpenAI), ~4 skipped (Docker)。
+
+**教训**: CI 调试应该先看错误日志，而不是猜测。错误日志明确显示 `AuthenticationError: 401` —— 这是 API key 无效，不是 keyring 导入失败。
+
+---
+
 ## 2026-07-09 ~19:20 | AI4SE 课程要求完善
 
 **触发**: 阅读 `AI4SE_Final_Project_通用要求.md` 和 `AI4SE_Final_Project_A_Coding_Agent_Harness (1).md`
