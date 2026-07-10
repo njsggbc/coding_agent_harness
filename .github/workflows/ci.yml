@@ -37,7 +37,7 @@ jobs:
           python -c "from harness.sandbox.guard import CommandGuard; print('guard OK')"
           python -c "from harness.storage.db import TaskStore; print('storage OK')"
           python -c "from harness.report.generator import ReportGenerator; print('report OK')"
-          python -c "from harness.webui import app; print('webui OK')"
+          python -c "from harness.webui import create_app; print('webui OK')"
           python -c "from harness.feedback import FeedbackAnalyzer; print('feedback OK')"
           python -c "from harness.memory import MemoryStore; print('memory OK')"
 
