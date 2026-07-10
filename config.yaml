@@ -1,0 +1,14 @@
+defaults:
+  model: "gpt-4o"
+  max_turns: 30
+  temperature: 0.0
+
+storage:
+  data_dir: "./data"
+
+docker:
+  default_image: "python:3.11"
+
+logging:
+  level: "INFO"
+  file: "harness.log"

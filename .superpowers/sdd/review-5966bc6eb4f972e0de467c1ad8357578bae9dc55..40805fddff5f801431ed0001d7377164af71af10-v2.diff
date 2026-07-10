@@ -1,0 +1,429 @@
+﻿
+# Review package: 5966bc6eb4f972e0de467c1ad8357578bae9dc55..40805fddff5f801431ed0001d7377164af71af10
+
+## Commits
+
+40805fd fix: address Task 2 review findings
+c4bfc0c feat: add task config model with YAML loader
+
+## Files changed
+
+ .superpowers/sdd/task-2-report.md |  74 ++++++++++++++++
+ harness/core/task.py              | 136 +++++++++++++++++++++++++++++
+ tests/core/__init__.py            |   0
+ tests/core/test_task.py           | 178 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 388 insertions(+)
+
+## Diff
+
+diff --git a/.superpowers/sdd/task-2-report.md b/.superpowers/sdd/task-2-report.md
+new file mode 100644
+index 0000000..ce61cab
+--- /dev/null
++++ b/.superpowers/sdd/task-2-report.md
+@@ -0,0 +1,74 @@
++# Task 2 Report: Task Model
++
++**Date:** 2026-07-09
++**Status:** DONE
++
++## TDD Evidence
++
++### RED Phase (Failing)
++```
++$ pytest tests/core/test_task.py -v
++ERROR: ImportError: cannot import name 'TaskConfig' from 'harness.core.task'
++(1 error during collection)
++```
++
++### GREEN Phase (Passing)
++```
++$ pytest tests/core/test_task.py -v
++tests/core/test_task.py::test_task_config_from_yaml PASSED
++tests/core/test_task.py::test_task_config_without_optional_fields PASSED
++tests/core/test_task.py::test_task_status_enum PASSED
++
++=== 3 passed ===
++```
++
++Full suite:
++```
++$ pytest tests/ -v
++tests/core/test_task.py::test_task_config_from_yaml PASSED
++tests/core/test_task.py::test_task_config_without_optional_fields PASSED
++tests/core/test_task.py::test_task_status_enum PASSED
++tests/test_scaffolding.py::test_imports PASSED
++
++=== 4 passed ===
++```
++
++## Commit
++
++- `c4bfc0c` - feat: add task config model with YAML loader
++
++## Notes
++
++- Test file had to use `encoding="utf-8"` in `write_text()` calls to match the UTF-8 encoding in `load_task_config`, otherwise Chinese characters in SAMPLE_TASK_YAML caused `UnicodeDecodeError` on Windows.
++- No deviations from the plan.
++
++## Review Fixes
++
++### Critical
++- Added `TaskConfig.from_yaml(path: str) -> TaskConfig` classmethod that delegates to `load_task_config`.
++
++### Important
++- Wrapped `load_task_config` in try/except for FileNotFoundError, yaml.YAMLError, KeyError with meaningful error messages. Also handles empty files and non-mapping YAML.
++- Renamed `test_task_config_from_yaml` to `test_load_task_config`.
++- Added validation in `from_dict`: checks for all required top-level fields, validates nested sections are dicts, and validates required nested fields with explicit error messages.
++- Added 7 edge-case tests: `from_yaml` classmethod, file not found, invalid YAML, empty file, non-mapping YAML, missing required field, missing nested section, missing nested field.
++
++### Test Results (after fixes)
++```
++tests/core/test_task.py::test_load_task_config PASSED
++tests/core/test_task.py::test_task_config_without_optional_fields PASSED
++tests/core/test_task.py::test_task_status_enum PASSED
++tests/core/test_task.py::test_from_yaml_classmethod PASSED
++tests/core/test_task.py::test_load_task_config_file_not_found PASSED
++tests/core/test_task.py::test_load_task_config_invalid_yaml PASSED
++tests/core/test_task.py::test_load_task_config_empty_file PASSED
++tests/core/test_task.py::test_load_task_config_not_a_mapping PASSED
++tests/core/test_task.py::test_from_dict_missing_required_field PASSED
++tests/core/test_task.py::test_from_dict_missing_nested_section PASSED
++tests/core/test_task.py::test_from_dict_missing_nested_field PASSED
++
++=== 11 passed ===
++```
++
++### Commit
++- (see below)
+\ No newline at end of file
+diff --git a/harness/core/task.py b/harness/core/task.py
+index e69de29..afe74a8 100644
+--- a/harness/core/task.py
++++ b/harness/core/task.py
+@@ -0,0 +1,136 @@
++from dataclasses import dataclass, field
++from enum import Enum
++from typing import Optional
++import yaml
++
++
++class TaskStatus(Enum):
++    PENDING = "pending"
++    RUNNING = "running"
++    DONE = "done"
++    FAILED = "failed"
++    CANCELLED = "cancelled"
++
++
++@dataclass
++class EnvironmentConfig:
++    image: str
++    setup_commands: list[str] = field(default_factory=list)
++
++
++@dataclass
++class AgentConfig:
++    model: str
++    max_turns: int
++    temperature: float
++
++
++@dataclass
++class SandboxConfig:
++    workdir: str
++    timeout: int
++    blocked_commands: list[str] = field(default_factory=list)
++
++
++@dataclass
++class VerificationConfig:
++    commands: list[str] = field(default_factory=list)
++
++
++@dataclass
++class TaskConfig:
++    id: str
++    name: str
++    description: str
++    repo: str
++    branch: str
++    environment: EnvironmentConfig
++    agent: AgentConfig
++    sandbox: SandboxConfig
++    base_commit: Optional[str] = None
++    verification: Optional[VerificationConfig] = None
++
++    @classmethod
++    def from_dict(cls, data: dict) -> "TaskConfig":
++        required_fields = ["id", "name", "description", "repo", "branch", "environment", "agent", "sandbox"]
++        for field in required_fields:
++            if field not in data:
++                raise KeyError(f"Missing required field: '{field}'")
++
++        if not isinstance(data.get("environment"), dict):
++            raise KeyError("'environment' section must be a dictionary")
++        if not isinstance(data.get("agent"), dict):
++            raise KeyError("'agent' section must be a dictionary")
++        if not isinstance(data.get("sandbox"), dict):
++            raise KeyError("'sandbox' section must be a dictionary")
++
++        env_data = data["environment"]
++        if "image" not in env_data:
++            raise KeyError("Missing required field: 'environment.image'")
++
++        agent_data = data["agent"]
++        for field in ["model", "max_turns", "temperature"]:
++            if field not in agent_data:
++                raise KeyError(f"Missing required field: 'agent.{field}'")
++
++        sandbox_data = data["sandbox"]
++        for field in ["workdir", "timeout"]:
++            if field not in sandbox_data:
++                raise KeyError(f"Missing required field: 'sandbox.{field}'")
++
++        env = EnvironmentConfig(
++            image=env_data["image"],
++            setup_commands=env_data.get("setup_commands", []),
++        )
++        agent = AgentConfig(
++            model=agent_data["model"],
++            max_turns=agent_data["max_turns"],
++            temperature=agent_data["temperature"],
++        )
++        sandbox = SandboxConfig(
++            workdir=sandbox_data["workdir"],
++            timeout=sandbox_data["timeout"],
++            blocked_commands=sandbox_data.get("blocked_commands", []),
++        )
++        verification = None
++        if "verification" in data and data["verification"] is not None:
++            verification = VerificationConfig(
++                commands=data["verification"].get("commands", [])
++            )
++
++        return cls(
++            id=data["id"],
++            name=data["name"],
++            description=data["description"],
++            repo=data["repo"],
++            branch=data["branch"],
++            base_commit=data.get("base_commit"),
++            environment=env,
++            agent=agent,
++            sandbox=sandbox,
++            verification=verification,
++        )
++
++    @classmethod
++    def from_yaml(cls, path: str) -> "TaskConfig":
++        return load_task_config(path)
++
++
++def load_task_config(path: str) -> TaskConfig:
++    try:
++        with open(path, "r", encoding="utf-8") as f:
++            data = yaml.safe_load(f)
++    except FileNotFoundError:
++        raise FileNotFoundError(f"Task config file not found: {path}")
++    except yaml.YAMLError as e:
++        raise yaml.YAMLError(f"Invalid YAML in task config: {path}\n{e}")
++
++    if data is None:
++        raise ValueError(f"Task config file is empty: {path}")
++    if not isinstance(data, dict):
++        raise ValueError(f"Task config must be a YAML mapping, got {type(data).__name__}: {path}")
++
++    try:
++        return TaskConfig.from_dict(data)
++    except KeyError as e:
++        raise KeyError(f"Invalid task config in {path}: {e}")
+\ No newline at end of file
+diff --git a/tests/core/__init__.py b/tests/core/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/tests/core/test_task.py b/tests/core/test_task.py
+new file mode 100644
+index 0000000..79cc239
+--- /dev/null
++++ b/tests/core/test_task.py
+@@ -0,0 +1,178 @@
++import pytest
++import yaml
++from pathlib import Path
++from harness.core.task import (
++    TaskConfig,
++    EnvironmentConfig,
++    AgentConfig,
++    SandboxConfig,
++    VerificationConfig,
++    TaskStatus,
++    load_task_config,
++)
++
++
++SAMPLE_TASK_YAML = """
++id: "bug-123"
++name: "淇鐧诲綍瓒呮椂"
++description: "淇 session 杩囨湡闂"
++repo: "https://github.com/example/repo"
++branch: "main"
++base_commit: "abc1234"
++
++environment:
++  image: "python:3.11"
++  setup_commands:
++    - "pip install -r requirements.txt"
++
++agent:
++  model: "gpt-4o"
++  max_turns: 30
++  temperature: 0.0
++
++sandbox:
++  workdir: "/workspace"
++  timeout: 600
++  blocked_commands:
++    - "rm -rf /"
++
++verification:
++  commands:
++    - "pytest tests/"
++"""
++
++
++def test_load_task_config(tmp_path):
++    task_file = tmp_path / "task.yaml"
++    task_file.write_text(SAMPLE_TASK_YAML, encoding="utf-8")
++
++    config = load_task_config(str(task_file))
++
++    assert config.id == "bug-123"
++    assert config.name == "淇鐧诲綍瓒呮椂"
++    assert config.repo == "https://github.com/example/repo"
++    assert config.branch == "main"
++    assert config.base_commit == "abc1234"
++
++    assert config.environment.image == "python:3.11"
++    assert config.environment.setup_commands == ["pip install -r requirements.txt"]
++
++    assert config.agent.model == "gpt-4o"
++    assert config.agent.max_turns == 30
++    assert config.agent.temperature == 0.0
++
++    assert config.sandbox.workdir == "/workspace"
++    assert config.sandbox.timeout == 600
++    assert config.sandbox.blocked_commands == ["rm -rf /"]
++
++    assert config.verification.commands == ["pytest tests/"]
++
++
++def test_task_config_without_optional_fields(tmp_path):
++    yaml_content = """
++id: "bug-456"
++name: "simple bug"
++description: "simple desc"
++repo: "https://github.com/example/repo"
++branch: "main"
++
++environment:
++  image: "python:3.11"
++  setup_commands: []
++
++agent:
++  model: "gpt-4o"
++  max_turns: 10
++  temperature: 0.0
++
++sandbox:
++  workdir: "/workspace"
++  timeout: 300
++  blocked_commands: []
++"""
++    task_file = tmp_path / "task.yaml"
++    task_file.write_text(yaml_content, encoding="utf-8")
++
++    config = load_task_config(str(task_file))
++
++    assert config.base_commit is None
++    assert config.verification is None
++
++
++def test_task_status_enum():
++    assert TaskStatus.PENDING.value == "pending"
++    assert TaskStatus.RUNNING.value == "running"
++    assert TaskStatus.DONE.value == "done"
++    assert TaskStatus.FAILED.value == "failed"
++    assert TaskStatus.CANCELLED.value == "cancelled"
++
++
++def test_from_yaml_classmethod(tmp_path):
++    task_file = tmp_path / "task.yaml"
++    task_file.write_text(SAMPLE_TASK_YAML, encoding="utf-8")
++
++    config = TaskConfig.from_yaml(str(task_file))
++
++    assert config.id == "bug-123"
++    assert config.name == "淇鐧诲綍瓒呮椂"
++
++
++def test_load_task_config_file_not_found():
++    with pytest.raises(FileNotFoundError, match="Task config file not found"):
++        load_task_config("nonexistent.yaml")
++
++
++def test_load_task_config_invalid_yaml(tmp_path):
++    task_file = tmp_path / "task.yaml"
++    task_file.write_text("id: [unclosed\n", encoding="utf-8")
++
++    with pytest.raises(yaml.YAMLError, match="Invalid YAML in task config"):
++        load_task_config(str(task_file))
++
++
++def test_load_task_config_empty_file(tmp_path):
++    task_file = tmp_path / "task.yaml"
++    task_file.write_text("", encoding="utf-8")
++
++    with pytest.raises(ValueError, match="Task config file is empty"):
++        load_task_config(str(task_file))
++
++
++def test_load_task_config_not_a_mapping(tmp_path):
++    task_file = tmp_path / "task.yaml"
++    task_file.write_text("- item1\n- item2\n", encoding="utf-8")
++
++    with pytest.raises(ValueError, match="Task config must be a YAML mapping"):
++        load_task_config(str(task_file))
++
++
++def test_from_dict_missing_required_field():
++    with pytest.raises(KeyError, match="Missing required field: 'id'"):
++        TaskConfig.from_dict({"name": "test"})
++
++
++def test_from_dict_missing_nested_section():
++    with pytest.raises(KeyError, match="Missing required field: 'environment'"):
++        TaskConfig.from_dict({
++            "id": "t1",
++            "name": "test",
++            "description": "desc",
++            "repo": "r",
++            "branch": "b",
++            "agent": {},
++            "sandbox": {},
++        })
++
++
++def test_from_dict_missing_nested_field():
++    with pytest.raises(KeyError, match="Missing required field: 'agent.model'"):
++        TaskConfig.from_dict({
++            "id": "t1",
++            "name": "test",
++            "description": "desc",
++            "repo": "r",
++            "branch": "b",
++            "environment": {"image": "img"},
++            "agent": {},
++            "sandbox": {"workdir": "/w", "timeout": 30},
++        })
+\ No newline at end of file

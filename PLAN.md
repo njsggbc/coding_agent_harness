@@ -3688,18 +3688,36 @@ git commit -m "test: add integration test and example task file"
 
 ## Plan Summary
 
-| Task | Component | Dependencies |
-|------|-----------|-------------|
-| 1 | Project Scaffolding | none |
-| 2 | Task Model | none |
-| 3 | Storage Layer | Task Model |
-| 4 | Sandbox Layer | none |
-| 5 | Adapter Layer | none |
-| 6 | Observer Layer | none |
-| 7 | Tool System | Sandbox |
-| 8 | Context Builder | Sandbox, Task Model |
-| 9 | AgentLoop | Adapter, Tools, Sandbox, Guard, Observer, Task Model, Context |
-| 10 | TaskManager | AgentLoop, Storage, Sandbox, Adapter, Tools, Guard, Observer |
-| 11 | Report Generator | Storage |
-| 12 | CLI | TaskManager, Report Generator, Task Model, Storage, Observer |
-| 13 | Integration Test | all |
+| Task | Component | Dependencies | Status | Commit |
+|------|-----------|-------------|--------|--------|
+| 1 | Project Scaffolding | none | ✅ Done | a4e4ee4 |
+| 2 | Task Model | none | ✅ Done | c4bfc0c, 40805fd |
+| 3 | Storage Layer | Task Model | ✅ Done | ae4b31b |
+| 4 | Sandbox Layer | none | ✅ Done | 0711776, 946bdc4 |
+| 5 | Adapter Layer | none | ✅ Done | 6d0d06f |
+| 6 | Observer Layer | none | ✅ Done | 8d67a9d |
+| 7 | Tool System | Sandbox | ✅ Done | 0768bb7 |
+| 8 | Context Builder | Sandbox, Task Model | ✅ Done | 525d5e4 |
+| 9 | AgentLoop | Adapter, Tools, Sandbox, Guard, Observer, Task Model, Context | ✅ Done | e615f4c, 2bcc66c |
+| 10 | TaskManager | AgentLoop, Storage, Sandbox, Adapter, Tools, Guard, Observer | ✅ Done | 3d9645d, 2109d39 |
+| 11 | Report Generator | Storage | ✅ Done | 567da73 |
+| 12 | CLI | TaskManager, Report Generator, Task Model, Storage, Observer | ✅ Done | 510b957, f45e168 |
+| 13 | Integration Test | all | ✅ Done | f0f726d |
+
+## Post-Plan Enhancements (AI4SE 课程要求)
+
+| Task | Description | Status | Commit |
+|------|-------------|--------|--------|
+| E1 | 凭据安全存储 (keyring + 引导录入) | ✅ Done | 3f64a28 |
+| E2 | SPEC.md 完善 (问题陈述、用户故事、威胁模型等) | ✅ Done | 28ebd31 |
+| E3 | SPEC_PROCESS.md (brainstorming 过程记录) | ✅ Done | 28ebd31 |
+| E4 | Dockerfile 分发 + README | ✅ Done | 328e32f |
+| E5 | CI/CD GitHub Actions | ✅ Done | 8dc2555 |
+| E6 | 反馈闭环机制 (FeedbackAnalyzer) | ✅ Done | 4be027f |
+| E7 | 记忆机制 (MemoryStore) | ✅ Done | 215201d |
+| E8 | 机制演示 (guard + feedback + governance) | ✅ Done | 287ea0d |
+| E9 | WebUI 接口 (FastAPI) | ✅ Done | f64da11 |
+| E10 | REFLECTION.md (反思报告) | ✅ Done | 78a1cf0 |
+| E11 | Final review fixes (8 issues) | ✅ Done | fbb7329 |
+
+**Final test result**: 132 passed, 6 skipped (Docker/API key)

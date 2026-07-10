@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feat/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Verify imports
+        run: |
+          python -c "import harness; print('harness OK')"
+          python -c "from harness.core.task import load_task_config; print('task OK')"
+          python -c "from harness.core.task_manager import TaskManager; print('task_manager OK')"
+          python -c "from harness.core.agent_loop import AgentLoop; print('agent_loop OK')"
+          python -c "from harness.adapters.openai import OpenAIAdapter; print('openai OK')"
+          python -c "from harness.tools.registry import ToolRegistry; print('tools OK')"
+          python -c "from harness.sandbox.guard import CommandGuard; print('guard OK')"
+          python -c "from harness.storage.db import TaskStore; print('storage OK')"
+          python -c "from harness.report.generator import ReportGenerator; print('report OK')"
+          python -c "from harness.webui import create_app; print('webui OK')"
+          python -c "from harness.feedback import FeedbackAnalyzer; print('feedback OK')"
+          python -c "from harness.memory import MemoryStore; print('memory OK')"
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=long
+
+      - name: Verify CLI entry point
+        run: harness --help

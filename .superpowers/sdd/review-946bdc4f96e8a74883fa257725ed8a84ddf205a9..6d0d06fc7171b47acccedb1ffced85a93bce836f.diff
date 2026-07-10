@@ -1,0 +1,175 @@
+﻿# Review package: 946bdc4f96e8a74883fa257725ed8a84ddf205a9..6d0d06fc7171b47acccedb1ffced85a93bce836f
+
+## Commits
+
+6d0d06f feat: add adapter layer with OpenAI implementation
+
+## Files changed
+
+ harness/adapters/base.py      | 31 ++++++++++++++++++++++++
+ harness/adapters/openai.py    | 50 +++++++++++++++++++++++++++++++++++++++
+ tests/adapters/__init__.py    |  0
+ tests/adapters/test_openai.py | 55 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 136 insertions(+)
+
+## Diff
+
+diff --git a/harness/adapters/base.py b/harness/adapters/base.py
+index e69de29..1778707 100644
+--- a/harness/adapters/base.py
++++ b/harness/adapters/base.py
+@@ -0,0 +1,31 @@
++from abc import ABC, abstractmethod
++from dataclasses import dataclass, field
++from typing import Optional
++
++
++@dataclass
++class ToolCall:
++    id: str
++    name: str
++    arguments: dict
++
++
++@dataclass
++class TokenUsage:
++    prompt_tokens: int = 0
++    completion_tokens: int = 0
++    total_tokens: int = 0
++
++
++@dataclass
++class AdapterResponse:
++    content: Optional[str] = None
++    tool_calls: list[ToolCall] = field(default_factory=list)
++    finish_reason: str = "stop"
++    usage: Optional[TokenUsage] = None
++
++
++class BaseAdapter(ABC):
++    @abstractmethod
++    async def chat(self, messages: list[dict], tools: list[dict]) -> AdapterResponse:
++        ...
+\ No newline at end of file
+diff --git a/harness/adapters/openai.py b/harness/adapters/openai.py
+new file mode 100644
+index 0000000..a855eb2
+--- /dev/null
++++ b/harness/adapters/openai.py
+@@ -0,0 +1,50 @@
++import json
++from openai import AsyncOpenAI
++from harness.adapters.base import BaseAdapter, AdapterResponse, ToolCall, TokenUsage
++
++
++class OpenAIAdapter(BaseAdapter):
++    def __init__(self, model: str, api_key: str, temperature: float):
++        self.model = model
++        self.temperature = temperature
++        self.client = AsyncOpenAI(api_key=api_key)
++
++    async def chat(self, messages: list[dict], tools: list[dict]) -> AdapterResponse:
++        kwargs = {
++            "model": self.model,
++            "messages": messages,
++            "temperature": self.temperature,
++        }
++        if tools:
++            kwargs["tools"] = tools
++            kwargs["tool_choice"] = "auto"
++
++        response = await self.client.chat.completions.create(**kwargs)
++        choice = response.choices[0]
++        message = choice.message
++
++        tool_calls = []
++        if message.tool_calls:
++            for tc in message.tool_calls:
++                try:
++                    args = json.loads(tc.function.arguments)
++                except json.JSONDecodeError:
++                    args = {}
++                tool_calls.append(
++                    ToolCall(id=tc.id, name=tc.function.name, arguments=args)
++                )
++
++        usage = None
++        if response.usage:
++            usage = TokenUsage(
++                prompt_tokens=response.usage.prompt_tokens,
++                completion_tokens=response.usage.completion_tokens,
++                total_tokens=response.usage.total_tokens,
++            )
++
++        return AdapterResponse(
++            content=message.content,
++            tool_calls=tool_calls,
++            finish_reason=choice.finish_reason or "stop",
++            usage=usage,
++        )
+\ No newline at end of file
+diff --git a/tests/adapters/__init__.py b/tests/adapters/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/tests/adapters/test_openai.py b/tests/adapters/test_openai.py
+new file mode 100644
+index 0000000..499f622
+--- /dev/null
++++ b/tests/adapters/test_openai.py
+@@ -0,0 +1,55 @@
++import pytest
++import os
++from harness.adapters.openai import OpenAIAdapter
++from harness.adapters.base import AdapterResponse
++
++
++@pytest.fixture
++def adapter():
++    api_key = os.environ.get("OPENAI_API_KEY", "test-key")
++    return OpenAIAdapter(model="gpt-4o", api_key=api_key, temperature=0.0)
++
++
++@pytest.mark.asyncio
++async def test_chat_simple_response(adapter):
++    if os.environ.get("OPENAI_API_KEY") is None:
++        pytest.skip("OPENAI_API_KEY not set")
++
++    messages = [{"role": "user", "content": "Say hello in one word."}]
++    tools = []
++
++    response = await adapter.chat(messages, tools)
++
++    assert isinstance(response, AdapterResponse)
++    assert response.content is not None
++    assert response.finish_reason == "stop"
++
++
++@pytest.mark.asyncio
++async def test_chat_with_tools(adapter):
++    if os.environ.get("OPENAI_API_KEY") is None:
++        pytest.skip("OPENAI_API_KEY not set")
++
++    messages = [{"role": "user", "content": "What is 2+2?"}]
++    tools = [
++        {
++            "type": "function",
++            "function": {
++                "name": "calculator",
++                "description": "Calculate a math expression",
++                "parameters": {
++                    "type": "object",
++                    "properties": {
++                        "expression": {"type": "string", "description": "Math expression"}
++                    },
++                    "required": ["expression"],
++                },
++            },
++        }
++    ]
++
++    response = await adapter.chat(messages, tools)
++
++    assert isinstance(response, AdapterResponse)
++    assert response.usage is not None
++    assert response.usage.total_tokens > 0
+\ No newline at end of file

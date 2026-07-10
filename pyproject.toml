@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harness"
+version = "0.1.0"
+description = "Coding Agent Harness - Bug-fixing agent orchestration framework"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.0.0",
+    "docker>=7.0.0",
+    "click>=8.1.0",
+    "pyyaml>=6.0",
+    "gitpython>=3.1.0",
+    "python-dotenv>=1.0.0",
+    "fastapi>=0.100.0,<0.116",
+    "uvicorn>=0.23.0,<0.35",
+    "jinja2>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+keyring = [
+    "keyring>=24.0.0",
+    "keyrings.alt>=5.0.0",
+]
+
+[project.scripts]
+harness = "harness.cli.main:cli"
+
+[tool.setuptools.packages.find]
+include = ["harness*"]
