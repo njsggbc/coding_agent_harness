@@ -1,9 +1,10 @@
 import os
 import pytest
-import keyring
-import keyring.backends.fail
+
+keyring = pytest.importorskip("keyring", reason="keyring not available in this environment")
+keyring_backends_fail = pytest.importorskip("keyring.backends.fail", reason="keyring backends not available")
 from keyring.backend import KeyringBackend
-from harness.credentials import CredentialManager
+from harness.credentials import CredentialManager, _KEYRING_AVAILABLE
 
 
 class MockKeyring(KeyringBackend):
