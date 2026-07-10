@@ -139,3 +139,21 @@
 **计划**：使用 GitHub Copilot CLI 或 Gemini CLI（与 OpenCode 不同），在不提供任何对话历史的前提下，让它尝试实现 Task 2（Task Model）。
 
 **验证结果将记录于此**。
+
+**验证指南**：详见项目根目录下的 `COLD_START_VERIFICATION.md`，包含：
+- 推荐的 Agent 选择（Claude Code / Copilot CLI / Cursor / Gemini CLI）
+- 标准 prompt 模板（仅提供 SPEC.md + PLAN.md，不提供历史上下文）
+- 结果记录模板
+- 推荐测试的 Task（Task 2: Task Model 或 Task 5: Adapter Layer）
+
+**验证完成后填写**：
+
+| 项目 | 记录 |
+|------|------|
+| 使用的 Agent | [待填写] |
+| 测试的 Task | [待填写] |
+| Agent 暂停提问的位置 | [待填写] |
+| 暴露的 spec 缺陷 | [待填写] |
+| 错误解读及原因 | [待填写] |
+| 产出与预期差距 | [待填写] |
+| 对 SPEC/PLAN 的修订 | [待填写] |
