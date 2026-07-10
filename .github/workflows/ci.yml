@@ -43,8 +43,6 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=long
-        env:
-          OPENAI_API_KEY: "sk-test-placeholder"
 
       - name: Verify CLI entry point
         run: harness --help
