@@ -169,8 +169,30 @@ docker run --rm \
 
 - **Windows-only keyring**: `harness credentials setup` uses the OS keyring, which may not work in headless Linux containers. Use `OPENAI_API_KEY` environment variable or `.env` file in Docker/CI environments.
 - **Docker required for sandbox**: All agent tasks run inside Docker containers. The sandbox layer requires a running Docker daemon and access to the Docker socket.
-- **No task timeout**: Long-running tasks are not automatically terminated. Use `harness cancel <task-id>` to stop a task manually.
 - **Single agent per task**: Each task runs one agent. No parallel or multi-agent orchestration.
+- **Keyring on headless Linux**: `harness credentials setup` requires a keyring backend. On headless Linux, use `OPENAI_API_KEY` environment variable or `.env` file instead.
+
+## Deployment
+
+### WebUI (Render)
+
+This project includes a FastAPI WebUI (`harness web`). To deploy on Render:
+
+1. Fork this repo
+2. Create a new Web Service on [Render](https://render.com)
+3. Connect your repo and use the settings from `render.yaml`
+4. Set the `OPENAI_API_KEY` environment variable in Render dashboard
+
+**Deployed URL**: [待部署后填写]
+
+### Docker
+
+```bash
+docker build -t harness .
+docker run -it -v /var/run/docker.sock:/var/run/docker.sock harness --help
+```
+
+Note: The harness needs Docker socket access to create sandbox containers.
 
 ## Tech Stack
 
