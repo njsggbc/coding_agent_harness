@@ -263,6 +263,20 @@ logging:
 """)
 
 
+@cli.command()
+@click.option("--host", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", default=8000, type=int, help="Port to listen on")
+@click.option("--data-dir", default=None, help="Override data directory")
+def web(host, port, data_dir):
+    """Start the WebUI server."""
+    config = load_config()
+    ddir = get_data_dir(config, data_dir)
+    from harness.webui import run_server
+    click.echo(f"Starting WebUI at http://{host}:{port}")
+    click.echo(f"Data directory: {ddir}")
+    run_server(host=host, port=port, data_dir=ddir)
+
+
 @cli.group()
 def credentials():
     """Manage API keys with secure OS-level storage."""
