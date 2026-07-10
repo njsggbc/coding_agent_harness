@@ -12,6 +12,7 @@ from harness.observer.base import Observer
 from harness.observer.stream import StreamObserver
 from harness.observer.logger import LogObserver
 from harness.cli.formatters import format_status_table, format_task_detail
+from harness.credentials import CredentialManager
 
 
 def load_config():
@@ -23,14 +24,6 @@ def load_config():
                 loaded = yaml.safe_load(f) or {}
                 config.update(loaded)
     return config
-
-
-def resolve_api_key(config):
-    key = config.get("api", {}).get("openai_api_key", "")
-    if key.startswith("${") and key.endswith("}"):
-        env_var = key[2:-1]
-        return os.environ.get(env_var, "")
-    return key or os.environ.get("OPENAI_API_KEY", "")
 
 
 def get_data_dir(config, cli_data_dir):
@@ -70,7 +63,8 @@ def cli(ctx):
 def run(task_file, no_stream, data_dir):
     """Execute a bug-fixing task from a YAML file."""
     config = load_config()
-    api_key = resolve_api_key(config)
+    creds = CredentialManager()
+    api_key = creds.get_api_key()
     ddir = get_data_dir(config, data_dir)
 
     if not api_key:
@@ -263,13 +257,78 @@ storage:
 docker:
   default_image: "python:3.11"
 
-api:
-  openai_api_key: "${OPENAI_API_KEY}"
-
 logging:
   level: "INFO"
   file: "harness.log"
 """)
+
+
+@cli.group()
+def credentials():
+    """Manage API keys with secure OS-level storage."""
+
+
+@credentials.command()
+def setup():
+    """Interactive guided setup for API key storage."""
+    CredentialManager().setup_wizard()
+
+
+@credentials.command()
+def status():
+    """Show which services have stored credentials (no plaintext)."""
+    mgr = CredentialManager()
+    services = mgr.list_services()
+    if not services:
+        click.echo("No credentials stored.")
+        return
+    click.echo("Stored credentials:")
+    for svc in sorted(services):
+        click.echo(f"  {svc}")
+
+
+@credentials.command()
+@click.argument("service")
+def update(service):
+    """Update an existing credential."""
+    mgr = CredentialManager()
+    if not mgr.has_credentials(service):
+        click.echo(f"No credential found for '{service}'.")
+        return
+    key = click.prompt("New API key", hide_input=True, confirmation_prompt=True)
+    mgr.store(service, key)
+    click.echo(f"Credential for '{service}' updated.")
+
+
+@credentials.command()
+@click.argument("service", required=False)
+@click.option("--all", "clear_all", is_flag=True, help="Remove all stored credentials")
+def clear(service, clear_all):
+    """Remove stored credentials."""
+    mgr = CredentialManager()
+    if clear_all:
+        services = mgr.list_services()
+        if not services:
+            click.echo("No credentials to clear.")
+            return
+        click.echo(f"Found {len(services)} credential(s):")
+        for svc in sorted(services):
+            click.echo(f"  {svc}")
+        if not click.confirm("Remove all credentials?"):
+            click.echo("Aborted.")
+            return
+        for svc in services:
+            mgr.delete(svc)
+        click.echo("All credentials removed.")
+        return
+    if not service:
+        click.echo("Error: provide a service name or use --all.", err=True)
+        raise SystemExit(1)
+    if not mgr.has_credentials(service):
+        click.echo(f"No credential found for '{service}'.")
+        return
+    mgr.delete(service)
+    click.echo(f"Credential for '{service}' removed.")
 
 
 if __name__ == "__main__":

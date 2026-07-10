@@ -9,9 +9,6 @@ storage:
 docker:
   default_image: "python:3.11"
 
-api:
-  openai_api_key: "${OPENAI_API_KEY}"
-
 logging:
   level: "INFO"
   file: "harness.log"
