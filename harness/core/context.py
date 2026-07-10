@@ -1,8 +1,9 @@
 from harness.core.task import TaskConfig
 from harness.sandbox.base import Sandbox
+from harness.memory import MemoryStore
 
 
-async def build_context(sandbox: Sandbox, task: TaskConfig, container_id: str) -> str:
+async def build_context(sandbox: Sandbox, task: TaskConfig, container_id: str, data_dir: str = "./data") -> str:
     parts = []
 
     result = await sandbox.exec(container_id, f"find . -type f -not -path './.git/*' | head -100")
@@ -24,6 +25,11 @@ async def build_context(sandbox: Sandbox, task: TaskConfig, container_id: str) -
         parts.append("```")
         parts.append(recent_commits)
         parts.append("```")
+
+    memory_store = MemoryStore(data_dir)
+    memory_context = memory_store.to_context_string(task.repo)
+    if memory_context:
+        parts.append(memory_context)
 
     parts.append(f"\n## Task")
     parts.append(f"**Title:** {task.name}")

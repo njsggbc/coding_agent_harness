@@ -13,6 +13,7 @@ from harness.observer.stream import StreamObserver
 from harness.observer.logger import LogObserver
 from harness.cli.formatters import format_status_table, format_task_detail
 from harness.credentials import CredentialManager
+from harness.memory import MemoryStore
 
 
 def load_config():
@@ -343,6 +344,84 @@ def clear(service, clear_all):
         return
     mgr.delete(service)
     click.echo(f"Credential for '{service}' removed.")
+
+
+@cli.group()
+def memory():
+    """Manage project memory across sessions."""
+
+
+@memory.command()
+@click.argument("repo")
+@click.argument("key")
+@click.argument("value")
+@click.option("--category", default="note", type=click.Choice(["convention", "decision", "knowledge", "note"]))
+@click.option("--data-dir", default=None, help="Override data directory")
+def add(repo, key, value, category, data_dir):
+    """Add or update a memory entry for a project."""
+    config = load_config()
+    ddir = get_data_dir(config, data_dir)
+    store = MemoryStore(ddir)
+    store.add(repo, key, value, category)
+    click.echo(f"Memory added: [{category}] {key} = {value}")
+
+
+@memory.command()
+@click.argument("repo")
+@click.option("--data-dir", default=None, help="Override data directory")
+def list(repo, data_dir):
+    """List all memory entries for a project."""
+    config = load_config()
+    ddir = get_data_dir(config, data_dir)
+    store = MemoryStore(ddir)
+    entries = store.get_all(repo)
+    if not entries:
+        click.echo(f"No memory entries for {repo}")
+        return
+    click.echo(f"Memory for {repo}:")
+    for entry in entries:
+        click.echo(f"  [{entry.category}] {entry.key}: {entry.value}")
+
+
+@memory.command()
+@click.argument("repo")
+@click.argument("key")
+@click.option("--data-dir", default=None, help="Override data directory")
+def remove(repo, key, data_dir):
+    """Remove a memory entry."""
+    config = load_config()
+    ddir = get_data_dir(config, data_dir)
+    store = MemoryStore(ddir)
+    store.remove(repo, key)
+    click.echo(f"Memory entry '{key}' removed.")
+
+
+@memory.command()
+@click.argument("repo")
+@click.option("--data-dir", default=None, help="Override data directory")
+def clear(repo, data_dir):
+    """Clear all memory for a project."""
+    config = load_config()
+    ddir = get_data_dir(config, data_dir)
+    store = MemoryStore(ddir)
+    store.clear(repo)
+    click.echo(f"All memory cleared for {repo}.")
+
+
+@memory.command()
+@click.option("--data-dir", default=None, help="Override data directory")
+def projects(data_dir):
+    """List all projects with stored memory."""
+    config = load_config()
+    ddir = get_data_dir(config, data_dir)
+    store = MemoryStore(ddir)
+    projects = store.list_projects()
+    if not projects:
+        click.echo("No projects with stored memory.")
+        return
+    click.echo("Projects with stored memory:")
+    for p in projects:
+        click.echo(f"  {p}")
 
 
 if __name__ == "__main__":
