@@ -6,3 +6,5 @@ data/
 dist/
 build/
 .worktrees/
+.superpowers/
+PR_DESCRIPTION.md

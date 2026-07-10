@@ -1,9 +1,18 @@
 import os
+import logging
 from typing import Optional
 
 import click
-import keyring
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
+
+try:
+    import keyring
+    _KEYRING_AVAILABLE = True
+except ImportError:
+    keyring = None
+    _KEYRING_AVAILABLE = False
 
 DEFAULT_SERVICE = "harness/openai"
 
@@ -12,19 +21,34 @@ class CredentialManager:
     def __init__(self, env_path: Optional[str] = None):
         self._env_path = env_path or ".env"
 
+    def _warn_keyring_unavailable(self):
+        if not _KEYRING_AVAILABLE:
+            logger.warning("keyring is not available on this platform. Credentials will only work via environment variables or .env files.")
+
     def store(self, service: str, key: str) -> None:
+        if not _KEYRING_AVAILABLE:
+            raise RuntimeError("keyring is not available. Use environment variables or .env file instead.")
         keyring.set_password(service, "api_key", key)
 
     def retrieve(self, service: str) -> Optional[str]:
-        return keyring.get_password(service, "api_key")
+        if not _KEYRING_AVAILABLE:
+            return None
+        try:
+            return keyring.get_password(service, "api_key")
+        except Exception:
+            return None
 
     def delete(self, service: str) -> None:
+        if not _KEYRING_AVAILABLE:
+            return
         try:
             keyring.delete_password(service, "api_key")
-        except keyring.errors.PasswordDeleteError:
+        except Exception:
             pass
 
     def list_services(self) -> list[str]:
+        if not _KEYRING_AVAILABLE:
+            return []
         if hasattr(keyring, "get_keyring"):
             backend = keyring.get_keyring()
             if hasattr(backend, "_store"):
