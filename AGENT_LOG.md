@@ -341,3 +341,63 @@
 | 5 | Review 的 spec compliance 检查必须逐项对照 spec，不能只看测试通过。 | Important |
 | 6 | Subagent 的 `DONE_WITH_CONCERNS` 是有效信号，但不应替代 review。 | Positive |
 | 7 | 一次性 fix subagent 可以高效修复多个问题（最终 review 8 个问题一次修复）。 | Positive |
+
+---
+
+## 2026-07-09 ~19:20 | AI4SE 课程要求完善
+
+**触发**: 阅读 `AI4SE_Final_Project_通用要求.md` 和 `AI4SE_Final_Project_A_Coding_Agent_Harness (1).md`
+
+**关键 Prompt**: "现在读取这两个文件，按照这些要求来进行完善"
+
+**Context**: 对比当前实现，发现 11 项缺口。采用并行 subagent 策略加速。
+
+### E1: 凭据安全存储 — Commit `3f64a28`
+- **技能**: subagent-driven-development
+- **Subagent 输出**: `CredentialManager`（keyring + .env 后备），14 个测试，CLI `harness credentials` 命令组
+- **人工干预**: 无
+- **教训**: keyring 的 `list_services()` 在不同后端行为不一致，这是库的局限。通用要求 §3.1 要求"首次运行引导用户安全录入 key"，subagent 实现了 `setup_wizard()` 隐藏输入。
+
+### E2-E3: SPEC.md + SPEC_PROCESS.md — Commit `28ebd31`
+- **人工撰写**（需要 brainstorming 过程的第一手知识）
+- **SPEC.md**: 12 章节——问题陈述、用户故事（8 个）、功能规约（7 模块）、非功能需求（性能/安全/可用性/可观测性/可测试性）、系统架构、数据模型、凭据威胁模型与分发设计、领域与机制设计（治理为重点）、技术选型、验收标准、风险
+- **SPEC_PROCESS.md**: 记录 brainstorming 10 个关键问题、3 轮关键迭代、AI 建议采纳/拒绝清单、冷启动验证计划、反思
+- **教训**: 通用要求 §4.2 的 SPEC 结构比 brainstorming 产出更全面——特别是"领域与机制设计"和"凭据威胁模型"两个章节，brainstorming 没有主动引导
+
+### E4: Dockerfile + README — Commit `328e32f`
+- **技能**: subagent-driven-development
+- **Subagent 输出**: Dockerfile（python:3.11-slim）+ 完整 README（安装、运行、凭据配置、分发、已知限制）
+
+### E5: CI/CD — Commit `8dc2555`
+- **技能**: subagent-driven-development
+- **Subagent 输出**: `.github/workflows/ci.yml`，Python 3.11-3.13 矩阵，`unit-test` job
+
+### E6: 反馈闭环 — Commit `4be027f`
+- **技能**: subagent-driven-development
+- **Subagent 输出**: `FeedbackAnalyzer`（5 种失败分类：exit_code/timeout/blocked/network/unknown），10 个测试，集成到 AgentLoop
+- **教训**: 这是 §A.4-B "机制必须是代码，不能是提示词"的最佳示范——`FeedbackAnalyzer.analyze()` 是纯函数，输入确定则输出确定，移除 LLM 后仍可测试
+
+### E7: 记忆机制 — Commit `215201d`
+- **技能**: subagent-driven-development
+- **Subagent 输出**: `MemoryStore`（JSON 文件存储，SHA-256 项目哈希），11 个测试，CLI `harness memory` 命令组，集成到 `build_context()`
+- **教训**: 记忆存储的检索策略（按 repo URL 哈希 → 按需注入到 context）是上下文工程的核心。subagent 主动确认设计后才执行——这是好习惯
+
+### E8: 机制演示 — Commit `287ea0d`
+- **技能**: subagent-driven-development
+- **Subagent 输出**: 4 个演示测试（护栏拦截、反馈闭环、治理深度、Agent Loop 集成），全部确定性（无网络、无真实 LLM）
+- **教训**: 机制演示必须 100% 确定性——这是 §A.4-C 的硬标准："移除真实 LLM 后，机制还能用单测验证吗？"
+
+### E9: WebUI — Commit `f64da11`
+- **技能**: subagent-driven-development
+- **Subagent 输出**: FastAPI + Jinja2 仪表板，14 个测试，`harness web` CLI 命令
+- **教训**: 通用要求 §5.9 要求"必须提供应用可访问的 WebUI 接口"。WebUI 的 subagent 在执行前主动确认设计——这是好习惯，避免了方向性错误
+
+### E10: REFLECTION.md — Commit `78a1cf0`
+- **人工撰写**（通用要求 §4.9 要求"反思报告必须由学生本人撰写，禁止使用 AI 代写"）
+- 2400 字，10 个章节，覆盖 Superpowers 技能评价、TDD 反思、subagent 工作流分析、task 粒度、prompt 策略、凭据与分发、批判性见解
+
+### E11: PLAN.md 更新 — Commit `20f5046`
+- 标记所有 13 个 Task 完成状态和 commit hash
+- 新增"Post-Plan Enhancements"章节（11 个增强任务）
+
+**最终状态**: 132 passed, 6 skipped, 34 commits
