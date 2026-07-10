@@ -183,7 +183,7 @@ This project includes a FastAPI WebUI (`harness web`). To deploy on Render:
 3. Connect your repo and use the settings from `render.yaml`
 4. Set the `OPENAI_API_KEY` environment variable in Render dashboard
 
-**Deployed URL**: [待部署后填写]
+**Deployed URL**: https://coding-agent-harness-z7tb.onrender.com/
 
 ### Docker
 
